@@ -249,7 +249,7 @@ func _updateData():
 	elif dashType == 4:
 		eightWayDash = true
 	
-	
+
 
 func _process(_delta):
 	#INFO animations
@@ -374,7 +374,7 @@ func _physics_process(delta):
 				_decelerate(delta, false)
 			else:
 				velocity.x = 0.1
-				
+					
 	if velocity.x > 0:
 		wasMovingR = true
 	elif velocity.x < 0:
@@ -469,7 +469,9 @@ func _physics_process(delta):
 		velocity.y = velocity.y / jumpVariable
 	
 	if jumps == 1:
-		if !is_on_floor() and !is_on_wall():
+		var is_grounded := is_on_floor() or _check_grounded_on_opposing_walls()
+		
+		if !is_grounded and !is_on_wall():
 			if coyoteTime > 0:
 				coyoteActive = true
 				_coyoteTime()
@@ -481,17 +483,17 @@ func _physics_process(delta):
 			if jumpBuffering > 0:
 				jumpWasPressed = true
 				_bufferJump()
-			elif jumpBuffering == 0 and coyoteTime == 0 and is_on_floor():
+			elif jumpBuffering == 0 and coyoteTime == 0 and is_grounded:
 				_jump()
-		elif jumpTap and is_on_wall() and !is_on_floor():
+		elif jumpTap and is_on_wall() and !is_grounded:
 			if wallJump and !latched:
 				_wallJump()
 			elif wallJump and latched:
 				_wallJump()
-		elif jumpTap and is_on_floor():
+		elif jumpTap and is_grounded:
 			_jump()
 			
-		if is_on_floor():
+		if is_grounded:
 			jumpCount = jumps
 			if coyoteTime > 0:
 				coyoteActive = true
@@ -593,6 +595,25 @@ func _physics_process(delta):
 	
 	if upToCancel and upHold and groundPound:
 		_endGroundPound()
+
+func _check_grounded_on_opposing_walls() -> bool:
+	var collision_count := get_slide_collision_count()
+	if collision_count < 2:
+		return false
+	# check each pair of wall collisions to see if the walls face opposite directions
+	for i in collision_count:
+		var a: KinematicCollision2D = get_slide_collision(i)
+		for j in range(i + 1, collision_count):
+			var b: KinematicCollision2D = get_slide_collision(j)
+			if sign(a.get_normal().x) == -sign(b.get_normal().x):
+				# at least one of the walls must be an upward-facing slope to count
+				var a_angle = a.get_angle()
+				if a_angle > floor_max_angle and a_angle <= PI/2.0:
+					return true
+				var b_angle = b.get_angle()
+				if b_angle > floor_max_angle and b_angle <= PI/2.0:
+					return true
+	return false
 	
 func _bufferJump():
 	await get_tree().create_timer(jumpBuffering).timeout
